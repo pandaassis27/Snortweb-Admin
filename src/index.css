@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* Custom premium styling defaults for the admin dashboard */
+body {
+  background-color: #151619;
+  color: #F5F3EF;
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+}
