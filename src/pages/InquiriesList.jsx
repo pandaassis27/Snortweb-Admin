@@ -8,6 +8,8 @@ export default function InquiriesList() {
   const [filter, setFilter] = useState("all"); // "all" | "unread" | "read"
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [replyCopied, setReplyCopied] = useState(false);
+  const [showReplyDropdown, setShowReplyDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedService, setSelectedService] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
@@ -77,6 +79,7 @@ export default function InquiriesList() {
         setInquiries(inquiries.filter((i) => i._id !== id));
         if (selectedInquiry && selectedInquiry._id === id) {
           setSelectedInquiry(null);
+          setShowReplyDropdown(false);
         }
       } catch (error) {
         alert("Error deleting inquiry: " + error.message);
@@ -88,6 +91,33 @@ export default function InquiriesList() {
     navigator.clipboard.writeText(text);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const handleReplyClick = (email) => {
+    navigator.clipboard.writeText(email);
+    setReplyCopied(true);
+    setTimeout(() => setReplyCopied(false), 3000);
+  };
+
+  const getGmailUrl = () => {
+    if (!selectedInquiry) return "";
+    const subject = encodeURIComponent(`Snortweb Technology - Re: Inquiry about ${selectedInquiry.service}`);
+    const body = encodeURIComponent(`Hi ${selectedInquiry.name},\n\nThank you for contacting Snortweb Technology. We received your inquiry regarding "${selectedInquiry.service}".\n\n[Write your reply here]\n\nBest regards,\nSnortweb Technology Team`);
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${selectedInquiry.email}&su=${subject}&body=${body}`;
+  };
+
+  const getOutlookUrl = () => {
+    if (!selectedInquiry) return "";
+    const subject = encodeURIComponent(`Snortweb Technology - Re: Inquiry about ${selectedInquiry.service}`);
+    const body = encodeURIComponent(`Hi ${selectedInquiry.name},\n\nThank you for contacting Snortweb Technology. We received your inquiry regarding "${selectedInquiry.service}".\n\n[Write your reply here]\n\nBest regards,\nSnortweb Technology Team`);
+    return `https://outlook.live.com/mail/0/deeplink/compose?to=${selectedInquiry.email}&subject=${subject}&body=${body}`;
+  };
+
+  const getMailtoUrl = () => {
+    if (!selectedInquiry) return "";
+    const subject = encodeURIComponent(`Snortweb Technology - Re: Inquiry about ${selectedInquiry.service}`);
+    const body = encodeURIComponent(`Hi ${selectedInquiry.name},\n\nThank you for contacting Snortweb Technology. We received your inquiry regarding "${selectedInquiry.service}".\n\n[Write your reply here]\n\nBest regards,\nSnortweb Technology Team`);
+    return `mailto:${selectedInquiry.email}?subject=${subject}&body=${body}`;
   };
 
   const servicesList = ["All", ...new Set(inquiries.map((i) => i.service))];
@@ -257,7 +287,10 @@ export default function InquiriesList() {
               filteredInquiries.map((inquiry) => (
                 <tr
                   key={inquiry._id}
-                  onClick={() => setSelectedInquiry(inquiry)}
+                  onClick={() => {
+                    setSelectedInquiry(inquiry);
+                    setShowReplyDropdown(false);
+                  }}
                   className={`hover:bg-slate-950/40 transition-colors cursor-pointer ${
                     !inquiry.read ? "bg-slate-950/10 font-medium" : ""
                   }`}
@@ -346,7 +379,10 @@ export default function InquiriesList() {
                 </span>
               </div>
               <button
-                onClick={() => setSelectedInquiry(null)}
+                onClick={() => {
+                  setSelectedInquiry(null);
+                  setShowReplyDropdown(false);
+                }}
                 className="text-slate-500 hover:text-slate-200 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -431,14 +467,62 @@ export default function InquiriesList() {
                 >
                   Mark as {selectedInquiry.read ? "Unread" : "Read"}
                 </button>
-                <a
-                  href={`mailto:${selectedInquiry.email}?subject=Snortweb Technology - Re: Inquiry about ${selectedInquiry.service}`}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded font-bold text-xs tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Reply</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowReplyDropdown(!showReplyDropdown)}
+                    className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded font-bold text-xs tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer min-w-[100px] justify-center"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>{replyCopied ? "Email Copied!" : "Reply"}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+
+                  {showReplyDropdown && (
+                    <div className="absolute right-0 bottom-full mb-2 w-52 bg-slate-950 border border-slate-800 rounded-md shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                      <div className="px-3 py-1.5 border-b border-slate-900 text-[10px] text-slate-500 font-bold uppercase tracking-wider text-left">
+                        Choose Reply Channel
+                      </div>
+                      <a
+                        href={getGmailUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setShowReplyDropdown(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-900 hover:text-white transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-red-400" />
+                        <span>Gmail (Web)</span>
+                      </a>
+                      <a
+                        href={getOutlookUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setShowReplyDropdown(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-900 hover:text-white transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Outlook (Web)</span>
+                      </a>
+                      <a
+                        href={getMailtoUrl()}
+                        onClick={() => setShowReplyDropdown(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-900 hover:text-white transition-colors border-t border-slate-900"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Default Mail App</span>
+                      </a>
+                      <button
+                        onClick={() => {
+                          handleReplyClick(selectedInquiry.email);
+                          setShowReplyDropdown(false);
+                        }}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-900 hover:text-white transition-colors border-t border-slate-900 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Copy Email Address</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
