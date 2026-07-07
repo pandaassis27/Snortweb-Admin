@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LayoutDashboard, Briefcase, MessageSquare, LogOut, Shield, Inbox } from "lucide-react";
+import { LayoutDashboard, Briefcase, MessageSquare, LogOut, Shield, Inbox, Settings as SettingsIcon } from "lucide-react";
 
 export default function Sidebar() {
   const { logout, admin } = useAuth();
@@ -11,6 +11,7 @@ export default function Sidebar() {
     { name: "Projects", path: "/projects", icon: Briefcase },
     { name: "Reviews", path: "/reviews", icon: MessageSquare },
     { name: "Inquiries", path: "/inquiries", icon: Inbox },
+    { name: "Settings", path: "/settings", icon: SettingsIcon },
   ];
 
   return (

@@ -9,6 +9,7 @@ import ProjectForm from "./pages/ProjectForm";
 import ReviewsList from "./pages/ReviewsList";
 import ReviewForm from "./pages/ReviewForm";
 import InquiriesList from "./pages/InquiriesList";
+import Settings from "./pages/Settings";
 
 function ProtectedLayout() {
   const { isAuthenticated, loading } = useAuth();
@@ -38,6 +39,7 @@ function ProtectedLayout() {
           <Route path="/reviews/add" element={<ReviewForm />} />
           <Route path="/reviews/edit/:id" element={<ReviewForm />} />
           <Route path="/inquiries" element={<InquiriesList />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
