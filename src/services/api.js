@@ -1,10 +1,12 @@
 import axios from "axios";
+import toast from "react-hot-toast";
 
 const API = axios.create({
-  baseURL: "http://localhost:5050/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // Needed if backend uses secure cookies/CSRF
 });
 
 // Request interceptor to attach JWT token
@@ -16,7 +18,29 @@ API.interceptors.request.use(
     }
     return config;
   },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for generic error handling (401, 429)
+API.interceptors.response.use(
+  (response) => response,
   (error) => {
+    if (error.response) {
+      // 401 Unauthorized - token expired or invalid
+      if (error.response.status === 401) {
+        toast.error("Session expired. Please login again.");
+        localStorage.removeItem("adminToken");
+        // We will dispatch a custom event to notify AuthContext to log out gracefully
+        window.dispatchEvent(new Event("auth-unauthorized"));
+      }
+      
+      // 429 Too Many Requests - rate limiting
+      if (error.response.status === 429) {
+        toast.error("Too many requests. Please slow down.");
+      }
+    } else if (error.request) {
+      toast.error("Network error. Please check your connection.");
+    }
     return Promise.reject(error);
   }
 );

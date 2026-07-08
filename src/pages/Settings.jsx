@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../services/api";
 import { Link2, Plus, Trash2, Save, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -22,7 +22,7 @@ export default function Settings() {
 
   const fetchSettings = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/settings");
+      const res = await API.get("/settings");
       if (res.data && res.data.socialLinks) {
         setSocialLinks(res.data.socialLinks);
       }
@@ -39,11 +39,7 @@ export default function Settings() {
     setError("");
     setSuccess("");
     try {
-      const res = await axios.put(
-        "http://localhost:5000/api/settings",
-        { socialLinks: updatedLinks },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await API.put("/settings", { socialLinks: updatedLinks });
       setSocialLinks(res.data.socialLinks);
       setSuccess("Settings saved successfully.");
       setTimeout(() => setSuccess(""), 3000);

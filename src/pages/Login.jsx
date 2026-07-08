@@ -19,6 +19,21 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    
+    // Basic pre-flight validation
+    if (isRegistering) {
+      if (username.length < 3) {
+        return setError("Username must be at least 3 characters.");
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return setError("Invalid email address format.");
+      }
+      if (password.length < 6) {
+        return setError("Password must be at least 6 characters.");
+      }
+    }
+
     setLoading(true);
 
     try {

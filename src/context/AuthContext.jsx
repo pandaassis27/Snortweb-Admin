@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { authAPI } from "../services/api";
+import { jwtDecode } from "jwt-decode";
 
 const AuthContext = createContext();
 
@@ -12,18 +13,41 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem("adminToken");
       if (token) {
         try {
+          // Check token expiration first
+          const decoded = jwtDecode(token);
+          const currentTime = Date.now() / 1000;
+          if (decoded.exp < currentTime) {
+            throw new Error("Token expired");
+          }
+
           const { data } = await authAPI.getProfile();
           setAdmin(data);
+
+          // Set timeout for auto logout when token expires
+          const timeUntilExpiry = (decoded.exp - currentTime) * 1000;
+          const logoutTimer = setTimeout(() => {
+            logout();
+          }, timeUntilExpiry);
+
+          return () => clearTimeout(logoutTimer);
         } catch (error) {
           console.error("Profile fetch error:", error.message);
-          localStorage.removeItem("adminToken");
-          setAdmin(null);
+          logout();
         }
       }
       setLoading(false);
     };
 
     fetchProfile();
+
+    const handleUnauthorized = () => {
+      setAdmin(null);
+    };
+    window.addEventListener("auth-unauthorized", handleUnauthorized);
+    
+    return () => {
+      window.removeEventListener("auth-unauthorized", handleUnauthorized);
+    };
   }, []);
 
   const login = async (usernameOrEmail, password) => {
