@@ -3,10 +3,11 @@ import toast from "react-hot-toast";
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
   },
-  withCredentials: true, // Needed if backend uses secure cookies/CSRF
 });
 
 // Request interceptor to attach JWT token
@@ -33,7 +34,7 @@ API.interceptors.response.use(
         // We will dispatch a custom event to notify AuthContext to log out gracefully
         window.dispatchEvent(new Event("auth-unauthorized"));
       }
-      
+
       // 429 Too Many Requests - rate limiting
       if (error.response.status === 429) {
         toast.error("Too many requests. Please slow down.");
@@ -48,7 +49,11 @@ API.interceptors.response.use(
 export const authAPI = {
   login: (credentials) => API.post("/auth/login", credentials),
   register: (data) => API.post("/auth/register", data),
-  getProfile: () => API.get("/auth/profile"),
+  getProfile: (config = {}) =>
+    API.get("/auth/profile", {
+      ...config,
+
+    }),
 };
 
 export const projectAPI = {
