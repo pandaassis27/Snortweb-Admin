@@ -57,26 +57,43 @@ export const authAPI = {
 };
 
 export const projectAPI = {
-  getAll: () => API.get("/projects"),
+  getAll: (params, config = {}) => API.get("/projects", { params, ...config }),
   getById: (id) => API.get(`/projects/${id}`),
   create: (data) => API.post("/projects", data),
   update: (id, data) => API.put(`/projects/${id}`, data),
   delete: (id) => API.delete(`/projects/${id}`),
+  bulkDelete: (ids) => API.post("/projects/bulk-delete", { ids }),
 };
 
 export const reviewAPI = {
-  getAll: () => API.get("/reviews"),
+  getAll: (params, config = {}) => API.get("/reviews", { params, ...config }),
   getById: (id) => API.get(`/reviews/${id}`),
   create: (data) => API.post("/reviews", data),
   update: (id, data) => API.put(`/reviews/${id}`, data),
   delete: (id) => API.delete(`/reviews/${id}`),
+  bulkDelete: (ids) => API.post("/reviews/bulk-delete", { ids }),
 };
 
 export const inquiryAPI = {
-  getAll: () => API.get("/inquiries"),
+  getAll: (params, config = {}) => API.get("/inquiries", { params, ...config }),
   getById: (id) => API.get(`/inquiries/${id}`),
   update: (id, data) => API.put(`/inquiries/${id}`, data),
   delete: (id) => API.delete(`/inquiries/${id}`),
+  bulkDelete: (ids) => API.post("/inquiries/bulk-delete", { ids }),
+};
+
+export const mediaAPI = {
+  getAll: (params) => API.get("/media", { params }),
+  upload: (data, config = {}) => API.post("/media", data, { ...config, headers: { "Content-Type": "multipart/form-data" } }),
+  delete: (id) => API.delete(`/media/${id}`),
+};
+
+export const auditAPI = {
+  getAll: (params, config = {}) => API.get("/audit-logs", { params, ...config }),
+};
+
+export const dashboardAPI = {
+  getStats: (config = {}) => API.get("/dashboard/stats", config),
 };
 
 export default API;

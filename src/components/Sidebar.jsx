@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LayoutDashboard, Briefcase, MessageSquare, LogOut, Shield, Inbox, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, Briefcase, MessageSquare, LogOut, Shield, Inbox, Settings as SettingsIcon, FolderOpen, FileClock } from "lucide-react";
 
 export default function Sidebar() {
   const { logout, admin } = useAuth();
@@ -9,8 +9,10 @@ export default function Sidebar() {
   const menuItems = [
     { name: "Dashboard", path: "/", icon: LayoutDashboard },
     { name: "Projects", path: "/projects", icon: Briefcase },
+    { name: "Media", path: "/media", icon: FolderOpen },
     { name: "Reviews", path: "/reviews", icon: MessageSquare },
     { name: "Inquiries", path: "/inquiries", icon: Inbox },
+    { name: "Audit Logs", path: "/audit-logs", icon: FileClock },
     { name: "Settings", path: "/settings", icon: SettingsIcon },
   ];
 

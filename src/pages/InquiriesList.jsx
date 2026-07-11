@@ -1,61 +1,195 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { inquiryAPI } from "../services/api";
-import { Inbox, Eye, Trash2, Check, Mail, Copy, ExternalLink, X, RefreshCw } from "lucide-react";
+import { Inbox, Eye, Trash2, Check, Mail, Copy, ExternalLink, X, RefreshCw, Trash, AlertTriangle, Search } from "lucide-react";
+import toast from "react-hot-toast";
+
+const InquiryRow = React.memo(({ inquiry, isSelected, onSelect, onToggleRead, onDelete, onSelectInquiry }) => (
+  <tr
+    onClick={() => onSelectInquiry(inquiry)}
+    className={`hover:bg-slate-950/40 transition-colors cursor-pointer group ${
+      !inquiry.read ? "bg-slate-950/10 font-medium" : ""
+    }`}
+  >
+    <td className="py-4.5 px-6" onClick={(e) => e.stopPropagation()}>
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={() => onSelect(inquiry._id)}
+        className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-950 cursor-pointer"
+      />
+    </td>
+    <td className="py-4.5 px-6">
+      <div className={`font-bold ${!inquiry.read ? "text-slate-100" : "text-slate-300"}`}>
+        {inquiry.name}
+      </div>
+      <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+        <span>{inquiry.company || "Freelance / Indiv."}</span>
+        <span className="text-slate-700">•</span>
+        <span className="font-mono text-slate-400">{inquiry.email}</span>
+      </div>
+    </td>
+    <td className="py-4.5 px-6">
+      <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-500 font-medium tracking-wide">
+        {inquiry.service}
+      </span>
+    </td>
+    <td className="py-4.5 px-6">
+      <span className="font-mono text-slate-300">{inquiry.budget}</span>
+    </td>
+    <td className="py-4.5 px-6 text-slate-400 font-mono text-[10px]">
+      {new Date(inquiry.createdAt).toLocaleString()}
+    </td>
+    <td className="py-4.5 px-6" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={(e) => onToggleRead(inquiry, e)}
+        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase transition-colors border cursor-pointer ${
+          inquiry.read
+            ? "bg-slate-850 border-slate-700/50 text-slate-400 hover:bg-slate-800"
+            : "bg-purple-950/30 border-purple-500/20 text-purple-400 hover:bg-purple-950/60 animate-pulse"
+        }`}
+      >
+        {inquiry.read ? "Read" : "Unread"}
+      </button>
+    </td>
+    <td className="py-4.5 px-6 text-right" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-end gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => onSelectInquiry(inquiry)}
+          title="View Details"
+          className="p-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-slate-100 rounded transition-colors cursor-pointer"
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => onToggleRead(inquiry, e)}
+          title={inquiry.read ? "Mark as Unread" : "Mark as Read"}
+          className="p-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-slate-100 rounded transition-colors cursor-pointer"
+        >
+          <Check className={`w-3.5 h-3.5 ${!inquiry.read ? "text-emerald-500" : ""}`} />
+        </button>
+        <button
+          onClick={(e) => onDelete(inquiry._id, e)}
+          title="Delete Inquiry"
+          className="p-2 border border-slate-800 text-slate-400 hover:border-red-950/60 hover:text-red-400 rounded transition-colors cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </td>
+  </tr>
+));
 
 export default function InquiriesList() {
   const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Server-side options
   const [filter, setFilter] = useState("all"); // "all" | "unread" | "read"
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedService, setSelectedService] = useState("All");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [unreadCount, setUnreadCount] = useState(0); // From dashboard stats if needed, or approx
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Bulk Actions
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Detail Modal
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [replyCopied, setReplyCopied] = useState(false);
   const [showReplyDropdown, setShowReplyDropdown] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedService, setSelectedService] = useState("All");
-  const [sortBy, setSortBy] = useState("newest");
-  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  const fetchInquiries = async (isInitial = false) => {
+  const abortControllerRef = useRef(null);
+  
+  // Service list could be static or fetched. We will keep standard static ones
+  const servicesList = ["Web Development", "Mobile App", "UI/UX Design", "SEO", "Other"];
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1); // Reset page on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const fetchInquiries = useCallback(async (isInitial = true) => {
+    if (document.hidden) return; // Do not fetch if page is hidden (optimization)
+    
+    if (isInitial && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (isInitial) abortControllerRef.current = new AbortController();
+
     if (isInitial) setLoading(true);
     try {
-      const { data } = await inquiryAPI.getAll();
-      setInquiries(data);
+      const { data } = await inquiryAPI.getAll({
+        paginate: true,
+        page,
+        limit: 10,
+        search: debouncedSearch,
+        read: filter === "all" ? "" : filter === "read" ? "true" : "false",
+        sortBy,
+        sortOrder
+      }, { signal: isInitial ? abortControllerRef.current.signal : undefined });
+      
+      setInquiries(data.data);
+      setTotalPages(data.totalPages || 1);
+      setTotalCount(data.total || 0);
+      
+      // Keep selection if possible, otherwise clear it on page change
+      if (isInitial) setSelectedIds([]);
     } catch (error) {
-      console.error("Fetch inquiries error:", error.message);
+      if (error.name !== 'CanceledError') {
+        if (isInitial) toast.error("Failed to load inquiries.");
+      }
     } finally {
       if (isInitial) setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, filter, sortBy, sortOrder]);
 
+  // Initial load
   useEffect(() => {
     fetchInquiries(true);
-  }, []);
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, [fetchInquiries]);
 
+  // Auto-refresh interval (polling)
   useEffect(() => {
     if (!autoRefresh) return;
     const interval = setInterval(() => {
-      fetchInquiries(false);
+      fetchInquiries(false); // background fetch
     }, 10000); // 10s auto-refresh
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, fetchInquiries]);
 
-  const handleToggleRead = async (inquiry, e) => {
+  const handleToggleRead = useCallback(async (inquiry, e) => {
     if (e) e.stopPropagation();
     try {
       const updated = { ...inquiry, read: !inquiry.read };
-      const { data } = await inquiryAPI.update(inquiry._id, updated);
-      setInquiries(inquiries.map((i) => (i._id === inquiry._id ? data : i)));
+      await inquiryAPI.update(inquiry._id, updated);
+      fetchInquiries(false);
       
-      // Update selected inquiry modal state if open
       if (selectedInquiry && selectedInquiry._id === inquiry._id) {
-        setSelectedInquiry(data);
+        setSelectedInquiry(updated);
       }
     } catch (error) {
-      alert("Error updating inquiry status: " + error.message);
+      toast.error(error.response?.data?.error || "Error updating inquiry status");
     }
-  };
+  }, [fetchInquiries, selectedInquiry]);
 
   const handleMarkAllAsRead = async () => {
+    if (!window.confirm("Are you sure you want to mark all unread inquiries as read?")) return;
+    // We will do a generic update or loop over visible ones.
     const unreadList = inquiries.filter((i) => !i.read);
     if (unreadList.length === 0) return;
 
@@ -64,28 +198,60 @@ export default function InquiriesList() {
         inquiryAPI.update(i._id, { ...i, read: true })
       );
       await Promise.all(promises);
-      
-      setInquiries(inquiries.map((i) => ({ ...i, read: true })));
+      toast.success("Marked as read");
+      fetchInquiries(false);
     } catch (error) {
-      alert("Error marking all as read: " + error.message);
+      toast.error("Error marking all as read.");
     }
   };
 
-  const handleDelete = async (id, e) => {
+  const handleDelete = useCallback(async (id, e) => {
     if (e) e.stopPropagation();
     if (window.confirm("Are you sure you want to delete this inquiry?")) {
       try {
         await inquiryAPI.delete(id);
-        setInquiries(inquiries.filter((i) => i._id !== id));
+        toast.success("Inquiry deleted");
+        fetchInquiries(false);
+        setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
         if (selectedInquiry && selectedInquiry._id === id) {
           setSelectedInquiry(null);
           setShowReplyDropdown(false);
         }
       } catch (error) {
-        alert("Error deleting inquiry: " + error.message);
+        toast.error(error.response?.data?.error || "Error deleting inquiry");
       }
     }
+  }, [fetchInquiries, selectedInquiry]);
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} inquiries? This action cannot be undone.`)) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await inquiryAPI.bulkDelete(selectedIds);
+      toast.success(`${selectedIds.length} inquiries deleted successfully`);
+      fetchInquiries(true);
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Error performing bulk delete. Make sure you have SuperAdmin privileges.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(inquiries.map(p => p._id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = useCallback((id) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  }, []);
 
   const handleCopyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -120,48 +286,17 @@ export default function InquiriesList() {
     return `mailto:${selectedInquiry.email}?subject=${subject}&body=${body}`;
   };
 
-  const servicesList = ["All", ...new Set(inquiries.map((i) => i.service))];
-
-  const filteredInquiries = inquiries
-    .filter((inquiry) => {
-      // 1. Read/Unread filter
-      const matchFilter =
-        filter === "all" ||
-        (filter === "unread" && !inquiry.read) ||
-        (filter === "read" && inquiry.read);
-
-      // 2. Service category filter
-      const matchService = selectedService === "All" || inquiry.service === selectedService;
-
-      // 3. Search query filter
-      const matchSearch =
-        inquiry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inquiry.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (inquiry.company && inquiry.company.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        inquiry.message.toLowerCase().includes(searchTerm.toLowerCase());
-
-      return matchFilter && matchService && matchSearch;
-    })
-    .sort((a, b) => {
-      if (sortBy === "newest") return new Date(b.createdAt) - new Date(a.createdAt);
-      if (sortBy === "oldest") return new Date(a.createdAt) - new Date(b.createdAt);
-      if (sortBy === "name-asc") return a.name.localeCompare(b.name);
-      if (sortBy === "name-desc") return b.name.localeCompare(a.name);
-      return 0;
-    });
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-400 font-mono text-xs select-none">
-        LOADING INCOMING CHANNELS...
-      </div>
-    );
-  }
-
-  const unreadCount = inquiries.filter((i) => !i.read).length;
+  const handleSortChange = (e) => {
+    const val = e.target.value;
+    if (val === "newest") { setSortBy("createdAt"); setSortOrder("desc"); }
+    else if (val === "oldest") { setSortBy("createdAt"); setSortOrder("asc"); }
+    else if (val === "name-asc") { setSortBy("name"); setSortOrder("asc"); }
+    else if (val === "name-desc") { setSortBy("name"); setSortOrder("desc"); }
+    setPage(1);
+  };
 
   return (
-    <div className="p-8 space-y-6 max-w-6xl text-slate-300">
+    <div className="p-8 space-y-6 max-w-6xl mx-auto text-slate-300">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
@@ -186,7 +321,16 @@ export default function InquiriesList() {
               </span>
             </label>
           </div>
-          {unreadCount > 0 && (
+          {selectedIds.length > 0 ? (
+            <button
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+              className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 px-4 py-2.5 rounded font-bold text-xs tracking-wider uppercase flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <Trash className="w-4 h-4" />
+              <span>Delete Selected ({selectedIds.length})</span>
+            </button>
+          ) : (
             <button
               onClick={handleMarkAllAsRead}
               className="bg-slate-800 border border-slate-700 hover:border-slate-600 hover:text-slate-100 text-slate-300 px-4 py-2.5 rounded font-bold text-xs tracking-wider uppercase flex items-center gap-2 transition-colors cursor-pointer"
@@ -202,13 +346,13 @@ export default function InquiriesList() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-2">
         <div className="flex gap-2">
           {[
-            { key: "all", label: "All Messages", count: inquiries.length },
-            { key: "unread", label: "Unread", count: unreadCount, badgeColor: "bg-purple-500/20 text-purple-400" },
-            { key: "read", label: "Read", count: inquiries.length - unreadCount }
+            { key: "all", label: "All Messages" },
+            { key: "unread", label: "Unread", badgeColor: "bg-purple-500/20 text-purple-400" },
+            { key: "read", label: "Read" }
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setFilter(tab.key)}
+              onClick={() => { setFilter(tab.key); setPage(1); }}
               className={`px-4 py-2.5 text-xs font-bold tracking-wider uppercase border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
                 filter === tab.key
                   ? "border-amber-500 text-amber-500 font-extrabold"
@@ -216,11 +360,6 @@ export default function InquiriesList() {
               }`}
             >
               <span>{tab.label}</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                tab.badgeColor || "bg-slate-800 text-slate-400"
-              }`}>
-                {tab.count}
-              </span>
             </button>
           ))}
         </div>
@@ -228,31 +367,31 @@ export default function InquiriesList() {
 
       {/* Search & Filters Controls */}
       <div className="flex flex-col md:flex-row gap-4 bg-slate-900 border border-slate-800 p-4 rounded-lg shadow-sm">
-        <div className="flex-1">
+        <div className="flex-1 relative">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by sender name, email, company, or message query..."
-            className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 placeholder-slate-505 focus:outline-none focus:border-amber-500 transition-colors"
+            placeholder="Search by sender name, email, company, or message..."
+            className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 pl-9 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
           />
         </div>
         <div className="flex gap-4">
           <select
             value={selectedService}
-            onChange={(e) => setSelectedService(e.target.value)}
+            onChange={(e) => { setSelectedService(e.target.value); setPage(1); }}
             className="bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-350 focus:outline-none focus:border-amber-500 cursor-pointer transition-colors max-w-[180px]"
           >
             <option value="All">All Services</option>
-            {servicesList.filter(s => s !== "All").map((service) => (
+            {servicesList.map((service) => (
               <option key={service} value={service}>
                 {service}
               </option>
             ))}
           </select>
           <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            onChange={handleSortChange}
             className="bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-350 focus:outline-none focus:border-amber-500 cursor-pointer transition-colors"
           >
             <option value="newest">Newest First</option>
@@ -268,6 +407,14 @@ export default function InquiriesList() {
         <table className="w-full text-left border-collapse text-xs text-slate-300">
           <thead>
             <tr className="bg-slate-950 border-b border-slate-800 text-[10px] uppercase font-bold tracking-wider text-slate-400 select-none">
+              <th className="py-4.5 px-6 w-12">
+                <input
+                  type="checkbox"
+                  checked={inquiries.length > 0 && selectedIds.length === inquiries.length}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-950 cursor-pointer"
+                />
+              </th>
               <th className="py-4.5 px-6">Sender / Company</th>
               <th className="py-4.5 px-6">Service Interest</th>
               <th className="py-4.5 px-6">Budget</th>
@@ -277,93 +424,67 @@ export default function InquiriesList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {filteredInquiries.length === 0 ? (
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="animate-pulse bg-slate-900/50">
+                  <td className="py-4.5 px-6"><div className="w-4 h-4 bg-slate-800 rounded"></div></td>
+                  <td className="py-4.5 px-6"><div className="h-8 bg-slate-800 rounded w-3/4"></div></td>
+                  <td className="py-4.5 px-6"><div className="h-4 bg-slate-800 rounded w-16"></div></td>
+                  <td className="py-4.5 px-6"><div className="h-4 bg-slate-800 rounded w-16"></div></td>
+                  <td className="py-4.5 px-6"><div className="h-4 bg-slate-800 rounded w-24"></div></td>
+                  <td className="py-4.5 px-6"><div className="h-6 bg-slate-800 rounded w-16"></div></td>
+                  <td className="py-4.5 px-6"><div className="h-4 bg-slate-800 rounded w-8 ml-auto"></div></td>
+                </tr>
+              ))
+            ) : inquiries.length === 0 ? (
               <tr>
-                <td colSpan="6" className="py-12 px-6 text-center text-slate-500 font-mono">
-                  No inquiries found matching the "{filter}" filter.
+                <td colSpan="7" className="py-16 px-6 text-center text-slate-500">
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <AlertTriangle className="w-8 h-8 text-slate-600" />
+                    <p className="font-mono">No inquiries found matching the criteria.</p>
+                  </div>
                 </td>
               </tr>
             ) : (
-              filteredInquiries.map((inquiry) => (
-                <tr
-                  key={inquiry._id}
-                  onClick={() => {
-                    setSelectedInquiry(inquiry);
-                    setShowReplyDropdown(false);
-                  }}
-                  className={`hover:bg-slate-950/40 transition-colors cursor-pointer ${
-                    !inquiry.read ? "bg-slate-950/10 font-medium" : ""
-                  }`}
-                >
-                  {/* Sender Info */}
-                  <td className="py-4.5 px-6">
-                    <div className={`font-bold ${!inquiry.read ? "text-slate-100" : "text-slate-300"}`}>
-                      {inquiry.name}
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
-                      <span>{inquiry.company || "Freelance / Indiv."}</span>
-                      <span className="text-slate-700">•</span>
-                      <span className="font-mono text-slate-400">{inquiry.email}</span>
-                    </div>
-                  </td>
-                  {/* Service */}
-                  <td className="py-4.5 px-6">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-500 font-medium tracking-wide">
-                      {inquiry.service}
-                    </span>
-                  </td>
-                  {/* Budget */}
-                  <td className="py-4.5 px-6">
-                    <span className="font-mono text-slate-300">{inquiry.budget}</span>
-                  </td>
-                  {/* Date */}
-                  <td className="py-4.5 px-6 text-slate-400 font-mono text-[10px]">
-                    {new Date(inquiry.createdAt).toLocaleString()}
-                  </td>
-                  {/* Status */}
-                  <td className="py-4.5 px-6">
-                    <button
-                      onClick={(e) => handleToggleRead(inquiry, e)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase transition-colors border cursor-pointer ${
-                        inquiry.read
-                          ? "bg-slate-850 border-slate-700/50 text-slate-400 hover:bg-slate-800"
-                          : "bg-purple-950/30 border-purple-500/20 text-purple-400 hover:bg-purple-950/60 animate-pulse"
-                      }`}
-                    >
-                      {inquiry.read ? "Read" : "Unread"}
-                    </button>
-                  </td>
-                  {/* Actions */}
-                  <td className="py-4.5 px-6 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-2.5">
-                      <button
-                        onClick={() => setSelectedInquiry(inquiry)}
-                        title="View Details"
-                        className="p-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-slate-100 rounded transition-colors cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => handleToggleRead(inquiry, e)}
-                        title={inquiry.read ? "Mark as Unread" : "Mark as Read"}
-                        className="p-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-slate-100 rounded transition-colors cursor-pointer"
-                      >
-                        <Check className={`w-3.5 h-3.5 ${!inquiry.read ? "text-emerald-500" : ""}`} />
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(inquiry._id, e)}
-                        title="Delete Inquiry"
-                        className="p-2 border border-slate-800 text-slate-400 hover:border-red-950/60 hover:text-red-400 rounded transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+              inquiries.map((inquiry) => (
+                <InquiryRow 
+                  key={inquiry._id} 
+                  inquiry={inquiry}
+                  isSelected={selectedIds.includes(inquiry._id)}
+                  onSelect={handleSelectOne}
+                  onToggleRead={handleToggleRead}
+                  onDelete={handleDelete}
+                  onSelectInquiry={(inq) => { setSelectedInquiry(inq); setShowReplyDropdown(false); }}
+                />
               ))
             )}
           </tbody>
         </table>
+        
+        {/* Pagination Controls */}
+        {!loading && totalPages > 1 && (
+          <div className="bg-slate-950/50 border-t border-slate-800 p-4 flex items-center justify-between">
+            <span className="text-xs text-slate-500 font-mono">
+              PAGE {page} OF {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs text-slate-300 disabled:opacity-50 hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                PREV
+              </button>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs text-slate-300 disabled:opacity-50 hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                NEXT
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Inquiry Detail Modal */}

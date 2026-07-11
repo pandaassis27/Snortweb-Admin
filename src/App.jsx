@@ -13,6 +13,8 @@ const ReviewsList = lazy(() => import("./pages/ReviewsList"));
 const ReviewForm = lazy(() => import("./pages/ReviewForm"));
 const InquiriesList = lazy(() => import("./pages/InquiriesList"));
 const Settings = lazy(() => import("./pages/Settings"));
+const MediaManager = lazy(() => import("./pages/MediaManager"));
+const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 
 // Loading fallback for Suspense
 const LoadingFallback = () => (
@@ -65,6 +67,12 @@ function ProtectedLayout() {
             <Route path="/reviews/add" element={<ReviewForm />} />
             <Route path="/reviews/edit/:id" element={<ReviewForm />} />
             <Route path="/inquiries" element={<InquiriesList />} />
+            <Route path="/media" element={<MediaManager />} />
+            <Route path="/audit-logs" element={
+              <RequireSuperadmin>
+                <AuditLogs />
+              </RequireSuperadmin>
+            } />
             
             {/* Restricted Route */}
             <Route path="/settings" element={
