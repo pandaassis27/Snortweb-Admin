@@ -25,12 +25,18 @@ export default function Login() {
       if (username.length < 3) {
         return setError("Username must be at least 3 characters.");
       }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return setError("Invalid email address format.");
+      if (email !== "admin@snortweb.com") {
+        return setError("Only admin@snortweb.com is allowed.");
       }
-      if (password.length < 6) {
-        return setError("Password must be at least 6 characters.");
+      if (password !== "snort@@web@@technology!!") {
+        return setError("Invalid password for this account.");
+      }
+    } else {
+      if (email !== "admin@snortweb.com") {
+        return setError("Invalid credentials.");
+      }
+      if (password !== "snort@@web@@technology!!") {
+        return setError("Invalid credentials.");
       }
     }
 
@@ -97,14 +103,14 @@ export default function Login() {
 
           <div>
             <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1.5">
-              {isRegistering ? "Email Address" : "Username or Email"}
+              Email Address
             </label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-3.5 text-slate-500 w-4 h-4" />
               <input
-                type={isRegistering ? "email" : "text"}
+                type="email"
                 required
-                placeholder={isRegistering ? "admin@snortweb.com" : "admin / admin@snortweb.com"}
+                placeholder="admin@snortweb.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded px-10 py-3 text-xs outline-none focus:border-amber-500 transition-colors placeholder-slate-600 text-slate-100"
