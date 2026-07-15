@@ -26,6 +26,10 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     if (error.response) {
       // 401 Unauthorized - token expired or invalid
       if (error.response.status === 401) {
@@ -40,7 +44,7 @@ API.interceptors.response.use(
         toast.error("Too many requests. Please slow down.");
       }
     } else if (error.request) {
-      toast.error("Network error. Please check your connection.");
+      toast.error("Network error. Please check your connection.", { id: 'network-error' });
     }
     return Promise.reject(error);
   }
