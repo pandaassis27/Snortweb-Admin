@@ -2,6 +2,10 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const VITE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+console.log("========== RUNTIME API ==========");
+console.log("VITE_API_URL =", VITE_API_URL);
+console.log("window.location.origin =", window.location.origin);
+console.log("=================================");
 console.log("[DEBUG_AUTH] Initializing API Service. VITE_API_URL:", VITE_API_URL);
 
 const API = axios.create({
@@ -18,6 +22,11 @@ API.interceptors.request.use(
   (config) => {
     // Log the request method and URL
     console.log(`[DEBUG_AUTH] API Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+    try {
+      console.log("Final Login URL =", new URL(config.url, config.baseURL).toString());
+    } catch (e) {
+      console.log("Final Login URL =", config.baseURL + config.url);
+    }
     
     // Log payload securely (mask password)
     if (config.data) {
