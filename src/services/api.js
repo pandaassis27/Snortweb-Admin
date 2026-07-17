@@ -1,8 +1,11 @@
 import axios from "axios";
 import toast from "react-hot-toast";
 
+const VITE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+console.log("[DEBUG_AUTH] Initializing API Service. VITE_API_URL:", VITE_API_URL);
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: VITE_API_URL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -10,9 +13,19 @@ const API = axios.create({
   },
 });
 
-// Request interceptor to attach JWT token
+// Request interceptor to attach JWT token and log request
 API.interceptors.request.use(
   (config) => {
+    // Log the request method and URL
+    console.log(`[DEBUG_AUTH] API Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+    
+    // Log payload securely (mask password)
+    if (config.data) {
+      const safeData = { ...config.data };
+      if (safeData.password) safeData.password = "***MASKED***";
+      console.log(`[DEBUG_AUTH] Request Payload:`, safeData);
+    }
+
     const token = localStorage.getItem("adminToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -22,15 +35,21 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for generic error handling (401, 429)
+// Response interceptor for generic error handling (401, 429) and debug logs
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(`[DEBUG_AUTH] API Response Status: ${response.status} OK`);
+    return response;
+  },
   (error) => {
     if (axios.isCancel(error)) {
       return Promise.reject(error);
     }
 
     if (error.response) {
+      console.log(`[DEBUG_AUTH] API Response Status: ${error.response.status}`);
+      console.log(`[DEBUG_AUTH] API Response Error JSON:`, error.response.data);
+      
       // 401 Unauthorized - token expired or invalid
       if (error.response.status === 401) {
         toast.error("Session expired. Please login again.");
@@ -44,6 +63,7 @@ API.interceptors.response.use(
         toast.error("Too many requests. Please slow down.");
       }
     } else if (error.request) {
+      console.log(`[DEBUG_AUTH] API Network Error (No response received)`);
       toast.error("Network error. Please check your connection.", { id: 'network-error' });
     }
     return Promise.reject(error);
