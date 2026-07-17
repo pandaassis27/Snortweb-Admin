@@ -18,6 +18,8 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("handleLogin called (handleSubmit)");
+    console.log("About to call API");
     setError("");
     
     // Removed frontend hardcoded validation so it calls backend directly
@@ -118,6 +120,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
+            onClick={() => console.log("Button clicked")}
             className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 py-3.5 px-4 rounded font-bold tracking-widest text-xs uppercase flex items-center justify-center gap-2 mt-8 transition-colors cursor-pointer disabled:opacity-50"
           >
             {loading ? (
