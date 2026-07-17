@@ -20,25 +20,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     
-    // Basic pre-flight validation
-    if (isRegistering) {
-      if (username.length < 3) {
-        return setError("Username must be at least 3 characters.");
-      }
-      if (email !== "admin@snortweb.com") {
-        return setError("Only admin@snortweb.com is allowed.");
-      }
-      if (password !== "snort@@web@@technology!!") {
-        return setError("Invalid password for this account.");
-      }
-    } else {
-      if (email !== "admin@snortweb.com") {
-        return setError("Invalid credentials.");
-      }
-      if (password !== "snort@@web@@technology!!") {
-        return setError("Invalid credentials.");
-      }
-    }
+    // Removed frontend hardcoded validation so it calls backend directly
 
     setLoading(true);
 
